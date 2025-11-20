@@ -10,13 +10,13 @@ public class Task1 {
         System.out.print("Введите N (кол-во строк): ");
         int n = scan.nextInt();
 
-        Thread Child = new Thread(() -> {
+        Thread child = new Thread(() -> {
             for (int i=1; i<=n; i++){
                 System.out.println("от дочернего потока строка №"+i);
             }
         });
 
-        Child.start();
+        child.start();
 
         for (int i=1; i<=n; i++){
             System.out.println("от родительского потока строка №"+i);
