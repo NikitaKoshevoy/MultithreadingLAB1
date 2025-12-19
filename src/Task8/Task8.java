@@ -1,7 +1,10 @@
 package Task8;
 
 public class Task8 {
-    private static volatile boolean flag = true;
+
+    private static boolean flag = true;
+    private static boolean finished = false;
+    private static final Object monitor = new Object();
 
     public static void main(String[] args) throws InterruptedException {
         final int M = 500;
@@ -9,38 +12,49 @@ public class Task8 {
 
         Thread producer = new Thread(() -> {
             try {
-                while (true) {
+                while (!finished) {
                     Thread.sleep(M);
-                    flag = !flag;
-                    System.out.println("Producer переключил флаг" + flag);
+
+                    synchronized (monitor) {
+                        flag = !flag;
+                        System.out.println("Producer переключил → " + flag);
+                        monitor.notify();
+                    }
                 }
-            } catch (InterruptedException e) {
-                System.out.println("Producer остановлен");
-            }
+            } catch (InterruptedException ignored) {}
+            System.out.println("Producer завершился");
         });
 
         Thread consumer = new Thread(() -> {
             int remaining = K;
             int step = M / 10;
 
-            while (remaining > 0) {
-                if (flag) {
-                    System.out.println("Consumer: осталось " + remaining + " мс");
-                    remaining -= step;
-                    if (remaining < 0) {
-                        remaining = 0;
-                    }
-                }
+            try {
+                while (remaining > 0 && !finished) {
+                    synchronized (monitor) {
+                        while (!flag && !finished) {
+                            System.out.println("Consumer ждёт (flag = false)");
+                            monitor.wait();
+                        }
 
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+                        if (finished) break;
+
+                        System.out.println("Consumer: осталось " + remaining + " мс");
+                        remaining -= step;
+                        if (remaining < 0) remaining = 0;
+                    }
+
+                    Thread.sleep(step);
                 }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
-            System.out.println("Consumer: дошел до нуля!");
-            producer.interrupt();
+
+            synchronized (monitor) {
+                finished = true;
+                monitor.notify();
+            }
+            System.out.println("Consumer дошёл до нуля — завершаем!");
         });
 
         producer.start();
@@ -48,6 +62,7 @@ public class Task8 {
 
         consumer.join();
         producer.join();
+
         System.out.println("Программа завершена!");
     }
 }
